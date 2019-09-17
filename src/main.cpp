@@ -7,28 +7,50 @@
 
 using cv::Mat;
 using cv::Point2f;
+using cv::Point3d;
 
 using std::cout;
 using std::endl;
 using std::pair;
 using std::vector;
 
-Mat findHomographyFromLineCorrespondences(const vector<Point2f>& pointsToMapp, const vector<Point2f>& pointImages)
+Mat findHomographyHomogenousInput(const vector<Point3d>& pointsToMap, const vector<Point3d>& pointImages)
 {
-    auto transposed = cv::findHomography(pointImages, pointsToMapp, 0);
+    Mat A(pointsToMap.size() * 2, 9, CV_64F);
+    for (int i = 0; i < pointsToMap.size(); i++){
+	const Point3d& p0 = pointsToMap[i];
+	const Point3d& p1 = pointImages[i];
+	Mat r0 = (cv::Mat_<double>(1, 9) << p0.x*p1.z , p0.y*p1.z , p0.z*p1.z , 0 , 0 , 0 , -p0.x*p1.x , -p0.y*p1.x , -p0.z*p1.x);
+	r0.copyTo(A.row(2*i));
+	Mat r1 = (cv::Mat_<double>(1, 9) << 0 , 0 , 0 , p0.x*p1.z , p0.y*p1.z , p0.z*p1.z , -p0.x*p1.y , -p0.y*p1.y , -p0.z*p1.y);
+	r1.copyTo(A.row(2*i+1));
+    }
+    cout << A << endl;
+    auto res = cv::SVD(A, cv::SVD::FULL_UV);
+    cout << res.vt << endl << res.w << endl;
+    auto r = res.vt.row(8);
+    cout << "A*r = " << A * r.t() << endl;
+    Mat real_res(3, 3, CV_64F);
+    std::copy(r.begin<double>(), r.end<double>(), real_res.begin<double>());
+    return real_res;
+}
+
+Mat findHomographyFromLineCorrespondences(const vector<Point3d>& linesToMap, const vector<Point3d>& lineImages)
+{
+    auto transposed = findHomographyHomogenousInput(lineImages, linesToMap);
     Mat matImages(3, 4, CV_64F);
     for (int i = 0; i<3; i++)
 	for (int j = 0; j < 4; j++)
-	    matImages.at<double>(i, j) = i == 0 ? pointImages[j].x : (i == 1 ? pointImages[j].y : 1.0);
+	    matImages.at<double>(i, j) = i == 0 ? lineImages[j].x : (i == 1 ? lineImages[j].y : lineImages[j].z);
 
     Mat matToMap(3, 4, CV_64F);
     for (int i = 0; i<3; i++)
 	for (int j = 0; j < 4; j++)
-	    matToMap.at<double>(i, j) = i == 0 ? pointsToMapp[j].x : (i == 1 ? pointsToMapp[j].y : 1.0);
+	    matToMap.at<double>(i, j) = i == 0 ? linesToMap[j].x : (i == 1 ? linesToMap[j].y : linesToMap[j].z);
+
+
+    cout <<transposed << endl << transposed.type() << " " << matImages.type() << endl;
     Mat result = transposed * matImages;
-    for (int i = 0; i<3; i++)
-	for (int j = 0; j < 4; j++)
-	    result.at<double>(i, j) /= result.at<double>(2, j);
 
     cout << "To map " << matImages << endl << "Expected " << matToMap << endl << "Actual " << result << endl;
     return transposed.t();
@@ -39,12 +61,12 @@ const double A4Width = 100*4;
 
 struct DocumentEdges
 {
-    Point2f top;
-    Point2f bottom;
-    Point2f left;
-    Point2f right;
+    Point3d top;
+    Point3d bottom;
+    Point3d left;
+    Point3d right;
 
-    vector<Point2f> toVector() const
+    vector<Point3d> toVector() const
     {
         return {top, bottom, left, right};
     }
@@ -58,7 +80,7 @@ std::ostream &operator<<(std::ostream &out, const DocumentEdges &edges)
                << "Right: " << edges.right << endl << "---------------" << endl;
 }
 
-const DocumentEdges A4Edges{Point2f(0, -1/(0.1 * A4Height)), Point2f(0, -1/(0.9* A4Height)), Point2f(-1/(0.1 * A4Width), 0), Point2f(-1 /(0.9 * A4Width), 0)};
+const DocumentEdges A4Edges{Point3d(0, 1, 0), Point3d(0, -1, A4Height), Point3d(1, 0, 0), Point3d(-1, 0, A4Width)};
 
 DocumentEdges inputEdges;
 pair<Point2f, Point2f> top_corners;
@@ -73,13 +95,12 @@ void Repaint()
 {
 }
 
-Point2f ComputeLine(pair<Point2f, Point2f> corners)
+Point3d ComputeLine(pair<Point2f, Point2f> corners)
 {
     cv::Point3f a(corners.first.x, corners.first.y, 1.f);
     cv::Point3f b(corners.second.x, corners.second.y, 1.f);
 
-    auto cross = a.cross(b);
-    return Point2f(cross.x, cross.y) / cross.z;
+    return a.cross(b);
 }
 
 void ComputeEdges()
