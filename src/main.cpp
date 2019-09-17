@@ -1,34 +1,39 @@
 #include <stdio.h>
 #include <opencv2/opencv.hpp>
-using namespace cv;
 
-int main(int argc, char** argv )
+using cv::Mat;
+int main(int argc, char **argv)
 {
-    if ( argc != 2 )
+    if (argc != 2)
     {
         printf("usage: DisplayImage.out <Image_Path>\n");
         return -1;
     }
+    const char *window_name = "gradient";
 
-    Mat src;
-    src = imread( argv[1], 1 );
+    double low_threshold = 20;
+    double high_threshold = 50;
 
-    if ( !src.data )
+    Mat src, src_gray;
+    src = cv::imread(argv[1], 1);
+        
+    if (!src.data)
     {
         printf("No src data \n");
         return -1;
     }
 
-    Mat srcGray;
-    ocl:cvtColor(src, srcGray, COLOR_BGR2GRAY);
+    cv::cvtColor(src, src_gray, CV_BGR2GRAY);
 
-    Mat sobelX;
-    Sobel(srcGray, sobelX, srcGray.type(), 1, 0, 3, 1, 0, BORDER_REFLECT_101);
+    Mat edges;
+    cv::Canny(src_gray, edges, low_threshold, high_threshold);
 
-    namedWindow("Display Image", WINDOW_AUTOSIZE );
-    imshow("Display Image", sobelX);
+    cv::namedWindow("Edges", CV_WINDOW_AUTOSIZE);
+    cv::namedWindow("Grayscale", CV_WINDOW_AUTOSIZE);
 
-    waitKey(0);
+    cv::imshow("Grayscale", src_gray);
 
+    cv::imshow("Edges", edges);
+    cv::waitKey(0);
     return 0;
 }
