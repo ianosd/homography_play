@@ -15,7 +15,23 @@ using std::vector;
 
 Mat findHomographyFromLineCorrespondences(const vector<Point2f>& pointsToMapp, const vector<Point2f>& pointImages)
 {
-    return cv::findHomography(pointImages, pointsToMapp, 0).t();
+    auto transposed = cv::findHomography(pointImages, pointsToMapp, 0);
+    Mat matImages(3, 4, CV_64F);
+    for (int i = 0; i<3; i++)
+	for (int j = 0; j < 4; j++)
+	    matImages.at<double>(i, j) = i == 0 ? pointImages[j].x : (i == 1 ? pointImages[j].y : 1.0);
+
+    Mat matToMap(3, 4, CV_64F);
+    for (int i = 0; i<3; i++)
+	for (int j = 0; j < 4; j++)
+	    matToMap.at<double>(i, j) = i == 0 ? pointsToMapp[j].x : (i == 1 ? pointsToMapp[j].y : 1.0);
+    Mat result = transposed * matImages;
+    for (int i = 0; i<3; i++)
+	for (int j = 0; j < 4; j++)
+	    result.at<double>(i, j) /= result.at<double>(2, j);
+
+    cout << "To map " << matImages << endl << "Expected " << matToMap << endl << "Actual " << result << endl;
+    return transposed.t();
 }
 
 const double A4Height = 141*4;
@@ -39,10 +55,10 @@ std::ostream &operator<<(std::ostream &out, const DocumentEdges &edges)
     return out << "Top: " << edges.top << endl
                << "Bottom: " << edges.bottom << endl
                << "Left: " << edges.left << endl
-               << "Right: " << edges.right << "---------------" << endl;
+               << "Right: " << edges.right << endl << "---------------" << endl;
 }
 
-const DocumentEdges A4Edges{Point2f(0, -0.1 / A4Height), Point2f(0, -0.9 / A4Height), Point2f(-0.1 / A4Width, 0), Point2f(-0.9 / A4Width, 0)};
+const DocumentEdges A4Edges{Point2f(0, -1/(0.1 * A4Height)), Point2f(0, -1/(0.9* A4Height)), Point2f(-1/(0.1 * A4Width), 0), Point2f(-1 /(0.9 * A4Width), 0)};
 
 DocumentEdges inputEdges;
 pair<Point2f, Point2f> top_corners;
@@ -77,12 +93,14 @@ void CallBackFunc(int event, int x, int y, int flags, void *userdata)
     {
     case cv::EVENT_LBUTTONDOWN:
         (*current_corner_pair)->first = Point2f(x, y);
+	cout << Point2f(x, y) << endl;
         break;
     case cv::EVENT_MOUSEMOVE:
         (*current_corner_pair)->second = Point2f(x, y);
         Repaint();
         break;
     case cv::EVENT_LBUTTONUP:
+	cout << Point2f(x, y) << endl;
         (*current_corner_pair)->second = Point2f(x, y);
         ComputeEdges();
         Repaint();
@@ -100,6 +118,11 @@ void CallBackFunc(int event, int x, int y, int flags, void *userdata)
             Mat result(A4Width, A4Height, src.type());
             cv::warpPerspective(src, result, homography, {A4Width, A4Height});
             cv::imshow("result", result);
+
+	    auto ptest = Mat(cv::Point3d(top_corners.first.x, top_corners.first.y, 1.f));
+	    Mat transform = homography * ptest;
+	     transform = transform / transform.at<double>(2, 0);
+	    cout << "Test " << ptest << " -> " << transform << endl;
         }
         break;
     }
@@ -127,13 +150,13 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    cv::cvtColor(src, src_gray, CV_BGR2GRAY);
+    cv::cvtColor(src, src_gray, cv::COLOR_BGR2GRAY);
 
     Mat edges;
     cv::Canny(src_gray, edges, low_threshold, high_threshold);
 
-cv::namedWindow("result", CV_WINDOW_AUTOSIZE);
-    cv::namedWindow(window_name, CV_WINDOW_AUTOSIZE);
+    cv::namedWindow("result", cv::WINDOW_AUTOSIZE);
+    cv::namedWindow(window_name, cv::WINDOW_AUTOSIZE);
     cv::setMouseCallback(window_name, CallBackFunc, &src);
     cv::imshow(window_name, src);
     cv::waitKey(0);
