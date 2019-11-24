@@ -14,7 +14,12 @@ using std::endl;
 using std::pair;
 using std::vector;
 
-Mat findHomographyHomogenousInput(const vector<Point3d>& pointsToMap, const vector<Point3d>& pointImages)
+/**
+ * Returns a matrix that maps the points pointsToMap to corresponding pointImages
+ * The points use homogenous representation. That is, if it is to represent the point (x, y)
+ * in an image, the point should be (alpha*x, alpha*y, alpha)
+ */
+Mat findHomographyFromPointCorespondences(const vector<Point3d>& pointsToMap, const vector<Point3d>& pointImages)
 {
     Mat A(pointsToMap.size() * 2, 9, CV_64F);
     for (int i = 0; i < pointsToMap.size(); i++){
@@ -35,25 +40,17 @@ Mat findHomographyHomogenousInput(const vector<Point3d>& pointsToMap, const vect
     return real_res;
 }
 
+/**
+ * Returns a matrix that maps the lines linesToMap to corresponding lineImages
+ * Lines are represented as triplets (Point3d objects), Given a triplet l,
+ * it has the usual meaning that l.t() * p = 0 for the (homogenously represented)
+ * points on the line.
+ */
 Mat findHomographyFromLineCorrespondences(const vector<Point3d>& linesToMap, const vector<Point3d>& lineImages)
 {
-    auto transposed = findHomographyHomogenousInput(lineImages, linesToMap);
-    Mat matImages(3, 4, CV_64F);
-    for (int i = 0; i<3; i++)
-	for (int j = 0; j < 4; j++)
-	    matImages.at<double>(i, j) = i == 0 ? lineImages[j].x : (i == 1 ? lineImages[j].y : lineImages[j].z);
-
-    Mat matToMap(3, 4, CV_64F);
-    for (int i = 0; i<3; i++)
-	for (int j = 0; j < 4; j++)
-	    matToMap.at<double>(i, j) = i == 0 ? linesToMap[j].x : (i == 1 ? linesToMap[j].y : linesToMap[j].z);
-
-
-    cout <<transposed << endl << transposed.type() << " " << matImages.type() << endl;
-    Mat result = transposed * matImages;
-
-    cout << "To map " << matImages << endl << "Expected " << matToMap << endl << "Actual " << result << endl;
-    return transposed.t();
+    // We can use the same procedure as when using points,
+    // but we have to invert the inputs and transpose the output
+    return findHomographyFromPointCorespondences(lineImages, linesToMap).t();
 }
 
 const double A4Height = 141*4;
