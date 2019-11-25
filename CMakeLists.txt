@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
 project( HomographyPlay )
 find_package( OpenCV REQUIRED )
-add_executable( crop_document src/main.cpp )
+add_executable( crop_document src/main.cpp src/line_detection.cpp)
 target_link_libraries( crop_document ${OpenCV_LIBS} )

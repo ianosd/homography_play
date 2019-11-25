@@ -1,18 +1,77 @@
 #include <stdio.h>
-#include <iostream>
-#include <opencv2/opencv.hpp>
-#include <opencv2/highgui/highgui.hpp>
 #include <vector>
 #include <tuple>
+#include <iostream>
+
+#include <opencv2/opencv.hpp>
+#include <opencv2/highgui/highgui.hpp>
+
+#include "line_detection.h"
 
 using cv::Mat;
 using cv::Point2f;
 using cv::Point3d;
+using cv::Point3f;
 
 using std::cout;
 using std::endl;
 using std::pair;
 using std::vector;
+
+bool isInBounds(float x, float max){ return x >= 0 && x <=max; }
+
+
+void drawLine(cv::Point3f homogenousLine, cv::Mat img)
+{
+    auto size = img.size();
+    float leftYIntercept = -1;
+    float rightYIntercept = -1;
+    float topXIntercept = -1;
+    float bottomXIntercept = -1;
+    if (homogenousLine.y != 0)
+    {
+	leftYIntercept = -homogenousLine.z/homogenousLine.y;
+	rightYIntercept = -(homogenousLine.x*size.width + homogenousLine.z)/homogenousLine.y;
+    }
+
+    if (homogenousLine.x != 0) 
+    {
+	topXIntercept = -homogenousLine.z/homogenousLine.x;
+	bottomXIntercept = -(homogenousLine.y*size.height + homogenousLine.z)/homogenousLine.x;
+    }
+
+    vector<Point2f> ends;
+    int i = 0;
+    while (i < 4 && ends.size() < 2)
+    {
+	switch(i){
+	    case 0:
+		if (isInBounds(leftYIntercept, size.height))
+		    ends.push_back(Point2f(0, leftYIntercept));
+		break;
+	    case 1:
+		if (isInBounds(rightYIntercept, size.height))
+		    ends.push_back(Point2f(size.width, rightYIntercept));
+		break;
+	    case 2:
+		if (isInBounds(topXIntercept, size.width))
+		    ends.push_back(Point2f(topXIntercept, 0));
+		break;
+	    case 3:
+		if (isInBounds(bottomXIntercept, size.width))
+		    ends.push_back(Point2f(bottomXIntercept, size.height));
+		break;
+	}
+	i++;
+    }
+    if (ends.size() != 2)
+    {
+	std::cerr << "Request to draw line that is not in the image" << std::endl;
+	return;
+    }
+
+    cv::line(img, ends[0], ends[1], cv::Scalar(0, 255, 0));
+}
 
 /**
  * Returns a matrix that maps the points pointsToMap to corresponding pointImages
@@ -156,10 +215,7 @@ int main(int argc, char **argv)
     }
     const char *window_name = "source image";
 
-    double low_threshold = 20;
-    double high_threshold = 50;
-
-    Mat src, src_gray;
+    Mat src;
     src = cv::imread(argv[1], 1);
 
     if (!src.data)
@@ -168,14 +224,19 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    cv::cvtColor(src, src_gray, cv::COLOR_BGR2GRAY);
+    auto lines = detectLines(src);
 
-    Mat edges;
-    cv::Canny(src_gray, edges, low_threshold, high_threshold);
+    for (auto line : lines)
+    {
+	cout << line.x << ", " << line.y << ", " << line.z << std::endl;
+    }
+
+    for (int i = 0; i< 10; i++){
+	drawLine(lines[i], src);
+    }
 
     cv::namedWindow("result", cv::WINDOW_AUTOSIZE);
     cv::namedWindow(window_name, cv::WINDOW_AUTOSIZE);
-    cv::setMouseCallback(window_name, CallBackFunc, &src);
     cv::imshow(window_name, src);
     cv::waitKey(0);
 
