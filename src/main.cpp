@@ -210,7 +210,7 @@ int main(int argc, char **argv)
 {
     if (argc != 2)
     {
-        printf("usage: DisplayImage.out <Image_Path>\n");
+        printf("usage: %s <Image_Path>\n", argv[0]);
         return -1;
     }
     const char *window_name = "source image";
@@ -226,13 +226,10 @@ int main(int argc, char **argv)
 
     auto lines = detectLines(src);
 
+    int i = 0;
     for (auto line : lines)
     {
-	cout << line.x << ", " << line.y << ", " << line.z << std::endl;
-    }
-
-    for (int i = 0; i< 10; i++){
-	drawLine(lines[i], src);
+	    drawLine(line, src);
     }
 
     cv::namedWindow("result", cv::WINDOW_AUTOSIZE);
