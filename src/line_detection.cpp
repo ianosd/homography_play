@@ -4,10 +4,10 @@
 #include <opencv2/opencv.hpp>
 
 #include <iostream>
+#include <algorithm>
 
 using std::vector;
 using cv::Point3f;
-using cv::Mat;
 
 namespace 
 {
@@ -24,7 +24,8 @@ namespace
 
 }
 
-vector<Point3f> detectLines(Mat src)
+std::pair<vector<Point3f>, Mat> detectLines2(Mat src)
+
 {
     Mat src_gray;
     cv::cvtColor(src, src_gray, cv::COLOR_BGR2GRAY);
@@ -37,5 +38,5 @@ vector<Point3f> detectLines(Mat src)
 
     vector<cv::Point3f> result(hough_result.size());
     std::transform(hough_result.begin(), hough_result.end(), result.begin(), &houghLineToHomogenousLine);
-    return result;
+    return std::make_pair(result, edges);
 }
