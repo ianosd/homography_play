@@ -62,11 +62,6 @@ Config global_config;
 // Define a function to populate Config from JSON
 void from_json(const nlohmann::json &j, Config &config)
 {
-    j.at("hough_threshold").get_to(config.hough_threshold);
-    j.at("low_threshold").get_to(config.low_threshold);
-    j.at("high_threshold").get_to(config.high_threshold);
-    j.at("hough_rho").get_to(config.hough_rho);
-    j.at("hough_theta").get_to(config.hough_theta);
     j.at("max_width").get_to(config.max_width);
     j.at("segment_range").get_to(config.segment_range);
     j.at("paper_width").get_to(config.paper_width);
