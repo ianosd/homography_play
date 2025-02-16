@@ -4,6 +4,9 @@ from torchvision.io import decode_image
 from torch.utils.data import Dataset
 import torch
 
+OUTPUT_SIZE = 5
+IMAGE_SIZE = 100
+
 class ImageTensor(object):
     def __init__(self, data, **kwargs):
         self._t = torch.as_tensor(data, **kwargs)
@@ -41,17 +44,21 @@ class PenTipDataset(Dataset):
 
     def __getitem__(self, idx):
         img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0])
-        image = ImageTensor(decode_image(img_path))
+        tensor = decode_image(img_path)
+        image = ImageTensor(tensor)
+        assert image.image_dimensions == (IMAGE_SIZE, IMAGE_SIZE)
+        reduction = 20
         x, y = tuple(self.img_labels.iloc[idx, 1:3].apply(round))
 
-        x = min(x, image.width-1)
-        y = min(y, image.height-1)
+        x = min(x, image.width-1) // reduction
+        y = min(y, image.height-1) // reduction
 
-        pen_tip_image = torch.zeros(image.image_dimensions)
+        pen_tip_image = torch.zeros((OUTPUT_SIZE, OUTPUT_SIZE))
         pen_tip_image[y, x] = 1
 
         if self.transform:
-            image = self.transform(image)
+            tensor = self.transform(tensor)
         if self.target_transform:
             pen_tip_image = self.target_transform(pen_tip_image)
-        return image, pen_tip_image
+        return tensor, pen_tip_image
+
