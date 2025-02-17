@@ -52,20 +52,21 @@ class Net(nn.Module):
 model = Net().to("cpu")
 print(model)
 
-# image, output = test_set[0]
-# y = model(image)
+image, output = test_set[5]
+y = model(image)
 
-# plt.subplot(131)
-# plt.imshow(image.permute((1, 2, 0)))
-# plt.subplot(132)
-# plt.imshow(output)
-# plt.subplot(133)
-# plt.imshow(y.detach().squeeze(0))
-# plt.show()
+plt.subplot(131)
+plt.imshow(image.permute((1, 2, 0)))
+plt.subplot(132)
+plt.imshow(output)
+plt.subplot(133)
+plt.imshow(y.detach().squeeze(0))
+plt.show()
 
-learning_rate = 1e-1
+# best parameters so far: lr 0.1, bs 10, ep (saturates at 20)
+learning_rate = 0.1 
 batch_size = 10
-epochs = 100
+epochs = 20
 
 loss_fn = nn.CrossEntropyLoss()
 
@@ -74,17 +75,68 @@ optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
 def train_loop(dataloader, model, loss_fn, optimizer):
     size = len(dataloader.dataset)
     model.train()
-    for batch_no, (X, y) in enumerate(dataloader):
-        pred = model(X).squeeze() # TODO why does the output have extra dim?
+    num_ok = 0
+    for (X, y) in dataloader:
+        pred = model(X).squeeze() # output is batch_size x 1 x 5 x 5
         loss = loss_fn(pred, y)
+        predictions = torch.argmax(torch.reshape(pred, (pred.shape[0], pred.shape[1]*pred.shape[2])), 1)
+        truth = torch.argmax(torch.reshape(y, (y.shape[0], y.shape[1]*y.shape[2])), 1)
+
+        num_ok += sum(predictions == truth)
 
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
-        print(f"After batch {batch_no}/{size} loss: {loss.item():>f}")
+
+    return loss.item(), num_ok
 
 train_data_loader = DataLoader(training_set, batch_size=batch_size, shuffle=True)
 
+class ProgressShower:
+    def __init__(self):
+        self.signals = {}
+        self.ax = []
+        self.fig, ax = plt.subplots()
+        self.ax.append(ax)
+        self.ax.append(ax.twinx())
+        ax.set_xlabel("epoch")
+        
+    def create_signal(self, name, ax_index):
+        line, = self.ax[ax_index].plot([], [], label=name);
+        self.signals[name] = [[], [], line]
+        
+    def add_point_to_signal(self, name, x, y):
+        self.signals[name][0].append(x)
+        self.signals[name][1].append(y)
+        self.signals[name][2].set_xdata(self.signals[name][0])
+        self.signals[name][2].set_ydata(self.signals[name][1])
+        
+        for ax in self.ax:
+            ax.relim()
+            ax.autoscale_view()
+
+        plt.legend()
+        plt.draw()
+        plt.pause(0.05)
+        
+progress = ProgressShower()
+progress.create_signal("loss", 0)
+progress.create_signal("~ train accuracy", 1)
+
 for epoch in range(epochs):
-    print(f"Epoch {epoch+1}/epochs")
-    train_loop(train_data_loader, model, loss_fn, optimizer)
+    loss, train_acc = train_loop(train_data_loader, model, loss_fn, optimizer)
+    progress.add_point_to_signal("loss", epoch, loss)
+    progress.add_point_to_signal("~ train accuracy", epoch, train_acc)
+
+plt.show()
+
+image, output = test_set[5]
+y = model(image)
+
+plt.subplot(131)
+plt.imshow(image.permute((1, 2, 0)))
+plt.subplot(132)
+plt.imshow(output)
+plt.subplot(133)
+plt.imshow(y.detach().squeeze(0))
+plt.show()
